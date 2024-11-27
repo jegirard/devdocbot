@@ -5,45 +5,47 @@ import fs from 'fs/promises';
 export async function generateSummaryDoc(config: Config): Promise<void> {
   const documentation: ProjectDocumentation = {};
 
-  // Process server-side modules if they exist
-  if (config.structure.server) {
+  // Process server-side code if root is specified
+  if (config.structure.server?.root) {
     documentation.server = {};
-    for (const [moduleName, moduleConfig] of Object.entries(config.structure.server.modules)) {
-      if (!moduleConfig) continue;
-
-      const modulePath = path.join(config.structure.server.root, moduleConfig.path);
-      try {
-        const files = await getFiles(modulePath, moduleConfig.pattern);
-        
-        documentation.server[moduleName] = {
-          name: moduleName,
-          description: moduleConfig.description,
-          files
+    const serverPath = config.structure.server.root;
+    try {
+      const pattern = config.structure.server.pattern || '**/*.{ts,js}';
+      const files = await getFiles(serverPath, pattern);
+      
+      // Group files by directory as pseudo-modules
+      const filesByDir = groupFilesByDirectory(files, serverPath);
+      for (const [dirName, dirFiles] of Object.entries(filesByDir)) {
+        documentation.server[dirName] = {
+          name: dirName,
+          description: `Files in ${dirName} directory`,
+          files: dirFiles
         };
-      } catch (error) {
-        console.warn(`Warning: Could not process module '${moduleName}' at path '${modulePath}' - Directory may not exist`);
       }
+    } catch (error) {
+      console.warn(`Warning: Could not process server code at path '${serverPath}' - Directory may not exist`);
     }
   }
 
-  // Process client-side modules if they exist
-  if (config.structure.client) {
+  // Process client-side code if root is specified
+  if (config.structure.client?.root) {
     documentation.client = {};
-    for (const [moduleName, moduleConfig] of Object.entries(config.structure.client.modules)) {
-      if (!moduleConfig) continue;
-
-      const modulePath = path.join(config.structure.client.root, moduleConfig.path);
-      try {
-        const files = await getFiles(modulePath, moduleConfig.pattern);
-        
-        documentation.client[moduleName] = {
-          name: moduleName,
-          description: moduleConfig.description,
-          files
+    const clientPath = config.structure.client.root;
+    try {
+      const pattern = config.structure.client.pattern || '**/*.{tsx,jsx}';
+      const files = await getFiles(clientPath, pattern);
+      
+      // Group files by directory as pseudo-modules
+      const filesByDir = groupFilesByDirectory(files, clientPath);
+      for (const [dirName, dirFiles] of Object.entries(filesByDir)) {
+        documentation.client[dirName] = {
+          name: dirName,
+          description: `Files in ${dirName} directory`,
+          files: dirFiles
         };
-      } catch (error) {
-        console.warn(`Warning: Could not process module '${moduleName}' at path '${modulePath}' - Directory may not exist`);
       }
+    } catch (error) {
+      console.warn(`Warning: Could not process client code at path '${clientPath}' - Directory may not exist`);
     }
   }
 
@@ -89,7 +91,7 @@ function generateMarkdown(documentation: ProjectDocumentation): string {
   // Add server documentation if exists
   if (documentation.server && Object.keys(documentation.server).length > 0) {
     markdown += '## Server Components\n\n';
-    for (const [moduleName, module] of Object.entries(documentation.server)) {
+    for (const [dirName, module] of Object.entries(documentation.server)) {
       markdown += `### ${module.name}\n\n`;
       markdown += `${module.description}\n\n`;
       
@@ -105,7 +107,7 @@ function generateMarkdown(documentation: ProjectDocumentation): string {
   // Add client documentation if exists
   if (documentation.client && Object.keys(documentation.client).length > 0) {
     markdown += '## Client Components\n\n';
-    for (const [moduleName, module] of Object.entries(documentation.client)) {
+    for (const [dirName, module] of Object.entries(documentation.client)) {
       markdown += `### ${module.name}\n\n`;
       markdown += `${module.description}\n\n`;
       
@@ -150,7 +152,11 @@ async function getFiles(dir: string, pattern: string): Promise<FileContent[]> {
       for (const entry of entries) {
         const fullPath = path.join(directory, entry.name);
         
+        // Skip node_modules and hidden directories
         if (entry.isDirectory()) {
+          if (entry.name === 'node_modules' || entry.name.startsWith('.')) {
+            continue;
+          }
           await scan(fullPath);
         } else if (entry.isFile() && regex.test(entry.name)) {
           const content = await fs.readFile(fullPath, 'utf-8');
@@ -168,4 +174,22 @@ async function getFiles(dir: string, pattern: string): Promise<FileContent[]> {
 
   await scan(dir);
   return files;
+}
+
+function groupFilesByDirectory(files: FileContent[], rootPath: string): { [key: string]: FileContent[] } {
+  const groups: { [key: string]: FileContent[] } = {};
+  
+  for (const file of files) {
+    // Get relative path from root
+    const relativePath = path.relative(rootPath, file.path);
+    // Get the top-level directory name
+    const topDir = relativePath.split(path.sep)[0];
+    
+    if (!groups[topDir]) {
+      groups[topDir] = [];
+    }
+    groups[topDir].push(file);
+  }
+  
+  return groups;
 }
