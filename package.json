@@ -1,47 +1,63 @@
 {
   "name": "@devdocbot/cli",
   "version": "1.0.0",
-  "description": "CLI tool to generate and query AI-optimized development documentation",
+  "description": "AI-powered documentation generator and query tool with vector search",
+  "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
-    "devdocbot": "./dist/index.js"
-  },
-  "scripts": {
-    "build": "tsc",
-    "start": "node --no-deprecation dist/index.js",
-    "dev": "ts-node --no-deprecation src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "npm run build"
-  },
-  "keywords": [
-    "cli",
-    "documentation",
-    "claude",
-    "ai",
-    "query",
-    "development"
-  ],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
-    "@babel/parser": "^7.22.5",
-    "@babel/traverse": "^7.22.5",
-    "commander": "^11.0.0",
-    "cosmiconfig": "^8.3.6",
-    "dotenv": "^16.3.1",
-    "glob": "^10.3.10",
-    "swagger-jsdoc": "^6.2.8"
-  },
-  "devDependencies": {
-    "@types/glob": "^8.1.0",
-    "@types/node": "^20.4.5",
-    "@types/swagger-jsdoc": "^6.0.1",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.1.6"
+    "devdocbot": "dist/index.js"
   },
   "files": [
     "dist",
-    "templates"
-  ]
+    "templates",
+    "config"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepare": "npm run clean && npm run build",
+    "prepublishOnly": "npm test && npm run lint",
+    "preversion": "npm run lint",
+    "version": "npm run format && git add -A src",
+    "postversion": "git push && git push --tags",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "lint": "tsc --noEmit && eslint \"src/**/*.ts\" --fix",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "documentation",
+    "ai",
+    "vector-search",
+    "code-analysis",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.18.0",
+    "@xenova/transformers": "^2.15.1",
+    "commander": "^12.0.0",
+    "cosmiconfig": "^9.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/devdocbot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/devdocbot/issues"
+  },
+  "homepage": "https://github.com/yourusername/devdocbot#readme"
 }

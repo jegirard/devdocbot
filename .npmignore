@@ -1,0 +1,22 @@
+# Source
+src/
+
+# Development files
+.eslintrc.json
+.prettierrc
+tsconfig.json
+.gitignore
+.git
+
+# Tests
+test/
+*.test.ts
+*.spec.ts
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.log
+.DS_Store
