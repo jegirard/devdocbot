@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "devdocbot": "dist/index.js"
+    "devdocbot": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -51,13 +51,5 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/yourusername/devdocbot.git"
-  },
-  "bugs": {
-    "url": "https://github.com/yourusername/devdocbot/issues"
-  },
-  "homepage": "https://github.com/yourusername/devdocbot#readme"
+  }
 }

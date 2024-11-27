@@ -13,12 +13,16 @@ export async function generateSummaryDoc(config: Config): Promise<void> {
       const pattern = config.structure.server.pattern || '**/*.{ts,js}';
       const files = await getFiles(serverPath, pattern);
       
+      // First, identify all module directories
+      const modules = await identifyModules(serverPath);
+      console.log('Discovered server modules:', Object.keys(modules));
+
       // Group files by directory as pseudo-modules
       const filesByDir = groupFilesByDirectory(files, serverPath);
       for (const [dirName, dirFiles] of Object.entries(filesByDir)) {
         documentation.server[dirName] = {
           name: dirName,
-          description: `Files in ${dirName} directory`,
+          description: modules[dirName] || `Files in ${dirName} directory`,
           files: dirFiles
         };
       }
@@ -35,12 +39,16 @@ export async function generateSummaryDoc(config: Config): Promise<void> {
       const pattern = config.structure.client.pattern || '**/*.{tsx,jsx}';
       const files = await getFiles(clientPath, pattern);
       
+      // First, identify all module directories
+      const modules = await identifyModules(clientPath);
+      console.log('Discovered client modules:', Object.keys(modules));
+
       // Group files by directory as pseudo-modules
       const filesByDir = groupFilesByDirectory(files, clientPath);
       for (const [dirName, dirFiles] of Object.entries(filesByDir)) {
         documentation.client[dirName] = {
           name: dirName,
-          description: `Files in ${dirName} directory`,
+          description: modules[dirName] || `Files in ${dirName} directory`,
           files: dirFiles
         };
       }
@@ -77,10 +85,72 @@ export async function generateSummaryDoc(config: Config): Promise<void> {
   const outputPath = path.join(config.outputDir, 'documentation.md');
   const markdownContent = generateMarkdown(documentation);
   await fs.writeFile(outputPath, markdownContent);
+
+  // Write modules list to a separate file
+  const modulesPath = path.join(config.outputDir, 'modules.md');
+  const modulesContent = generateModulesList(documentation);
+  await fs.writeFile(modulesPath, modulesContent);
+}
+
+function generateModulesList(documentation: ProjectDocumentation): string {
+  let markdown = '# Project Modules\n\n';
+
+  if (documentation.server && Object.keys(documentation.server).length > 0) {
+    markdown += '## Server Modules\n\n';
+    for (const [dirName, module] of Object.entries(documentation.server)) {
+      markdown += `### ${module.name}\n\n`;
+      markdown += `${module.description}\n\n`;
+      markdown += '**Files:**\n\n';
+      for (const file of module.files) {
+        const basename = path.basename(file.path);
+        markdown += `- ${basename}\n`;
+      }
+      markdown += '\n';
+    }
+  }
+
+  if (documentation.client && Object.keys(documentation.client).length > 0) {
+    markdown += '## Client Modules\n\n';
+    for (const [dirName, module] of Object.entries(documentation.client)) {
+      markdown += `### ${module.name}\n\n`;
+      markdown += `${module.description}\n\n`;
+      markdown += '**Files:**\n\n';
+      for (const file of module.files) {
+        const basename = path.basename(file.path);
+        markdown += `- ${basename}\n`;
+      }
+      markdown += '\n';
+    }
+  }
+
+  return markdown;
 }
 
 function generateMarkdown(documentation: ProjectDocumentation): string {
   let markdown = '# Project Documentation\n\n';
+
+  // Generate table of contents
+  markdown += '## Table of Contents\n\n';
+  if (documentation.overview) {
+    markdown += '- [Overview](#overview)\n';
+  }
+  markdown += '- [Modules](#modules)\n';
+  if (documentation.server && Object.keys(documentation.server).length > 0) {
+    markdown += '- [Server Components](#server-components)\n';
+    for (const [_, module] of Object.entries(documentation.server)) {
+      markdown += `  - [${module.name}](#${module.name.toLowerCase()})\n`;
+    }
+  }
+  if (documentation.client && Object.keys(documentation.client).length > 0) {
+    markdown += '- [Client Components](#client-components)\n';
+    for (const [_, module] of Object.entries(documentation.client)) {
+      markdown += `  - [${module.name}](#${module.name.toLowerCase()})\n`;
+    }
+  }
+  if (documentation.api) {
+    markdown += '- [API Documentation](#api-documentation)\n';
+  }
+  markdown += '\n---\n\n';
 
   // Add overview if exists
   if (documentation.overview) {
@@ -88,35 +158,72 @@ function generateMarkdown(documentation: ProjectDocumentation): string {
     markdown += documentation.overview + '\n\n';
   }
 
+  // Add modules section
+  markdown += '## Modules\n\n';
+  if (documentation.server && Object.keys(documentation.server).length > 0) {
+    markdown += '### Server Modules\n\n';
+    for (const [_, module] of Object.entries(documentation.server)) {
+      markdown += `- **${module.name}**: ${module.description}\n`;
+    }
+    markdown += '\n';
+  }
+  if (documentation.client && Object.keys(documentation.client).length > 0) {
+    markdown += '### Client Modules\n\n';
+    for (const [_, module] of Object.entries(documentation.client)) {
+      markdown += `- **${module.name}**: ${module.description}\n`;
+    }
+    markdown += '\n';
+  }
+
   // Add server documentation if exists
   if (documentation.server && Object.keys(documentation.server).length > 0) {
     markdown += '## Server Components\n\n';
+    markdown += 'Server-side code structure:\n\n```\n';
+    for (const [dirName, module] of Object.entries(documentation.server)) {
+      markdown += `${dirName}/\n`;
+      for (const file of module.files) {
+        const relativePath = path.relative(path.join(process.cwd(), dirName), file.path);
+        markdown += `  ${relativePath}\n`;
+      }
+    }
+    markdown += '```\n\n';
+
     for (const [dirName, module] of Object.entries(documentation.server)) {
       markdown += `### ${module.name}\n\n`;
       markdown += `${module.description}\n\n`;
       
+      markdown += '**Files:**\n\n';
       for (const file of module.files) {
-        markdown += `#### ${path.basename(file.path)}\n\n`;
-        markdown += '```typescript\n';
-        markdown += file.content + '\n';
-        markdown += '```\n\n';
+        const relativePath = path.relative(path.join(process.cwd(), dirName), file.path);
+        markdown += `- \`${relativePath}\`\n`;
       }
+      markdown += '\n';
     }
   }
 
   // Add client documentation if exists
   if (documentation.client && Object.keys(documentation.client).length > 0) {
     markdown += '## Client Components\n\n';
+    markdown += 'Client-side code structure:\n\n```\n';
+    for (const [dirName, module] of Object.entries(documentation.client)) {
+      markdown += `${dirName}/\n`;
+      for (const file of module.files) {
+        const relativePath = path.relative(path.join(process.cwd(), dirName), file.path);
+        markdown += `  ${relativePath}\n`;
+      }
+    }
+    markdown += '```\n\n';
+
     for (const [dirName, module] of Object.entries(documentation.client)) {
       markdown += `### ${module.name}\n\n`;
       markdown += `${module.description}\n\n`;
       
+      markdown += '**Files:**\n\n';
       for (const file of module.files) {
-        markdown += `#### ${path.basename(file.path)}\n\n`;
-        markdown += '```typescript\n';
-        markdown += file.content + '\n';
-        markdown += '```\n\n';
+        const relativePath = path.relative(path.join(process.cwd(), dirName), file.path);
+        markdown += `- \`${relativePath}\`\n`;
       }
+      markdown += '\n';
     }
   }
 
@@ -127,6 +234,53 @@ function generateMarkdown(documentation: ProjectDocumentation): string {
   }
 
   return markdown;
+}
+
+async function identifyModules(dir: string): Promise<{ [key: string]: string }> {
+  const modules: { [key: string]: string } = {};
+  
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+        const fullPath = path.join(dir, entry.name);
+        
+        // Check if directory contains module-related files
+        try {
+          const files = await fs.readdir(fullPath);
+          const hasModuleFiles = files.some(file => 
+            file.includes('module') || 
+            file.includes('controller') || 
+            file.includes('service') ||
+            file.includes('routes')
+          );
+          
+          if (hasModuleFiles) {
+            // Try to find a description from index.ts or similar files
+            let description = `${entry.name} module`;
+            try {
+              const indexContent = await fs.readFile(path.join(fullPath, 'index.ts'), 'utf-8');
+              const descMatch = indexContent.match(/\/\*\*([\s\S]*?)\*\//);
+              if (descMatch) {
+                description = descMatch[1].replace(/\s*\*\s*/g, ' ').trim();
+              }
+            } catch {
+              // No index.ts or no description found, use default
+            }
+            
+            modules[entry.name] = description;
+          }
+        } catch (error) {
+          console.warn(`Warning: Could not process directory '${fullPath}'`);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not scan directory '${dir}'`);
+  }
+  
+  return modules;
 }
 
 function globToRegex(pattern: string): string {
