@@ -1,7 +1,7 @@
 {
-  "name": "devdocbot",
+  "name": "@devdocbot/cli",
   "version": "1.0.0",
-  "description": "CLI tool to query development documentation using Claude AI and generate AI-optimized documentation",
+  "description": "CLI tool to generate and query AI-optimized development documentation",
   "main": "dist/index.js",
   "bin": {
     "devdocbot": "./dist/index.js"
@@ -11,7 +11,7 @@
     "start": "node --no-deprecation dist/index.js",
     "dev": "ts-node --no-deprecation src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "generate-docs": "bash scripts/generate-docs.sh"
+    "prepare": "npm run build"
   },
   "keywords": [
     "cli",
@@ -28,13 +28,20 @@
     "@babel/parser": "^7.22.5",
     "@babel/traverse": "^7.22.5",
     "commander": "^11.0.0",
+    "cosmiconfig": "^8.3.6",
     "dotenv": "^16.3.1",
+    "glob": "^10.3.10",
     "swagger-jsdoc": "^6.2.8"
   },
   "devDependencies": {
+    "@types/glob": "^8.1.0",
     "@types/node": "^20.4.5",
     "@types/swagger-jsdoc": "^6.0.1",
     "ts-node": "^10.9.1",
     "typescript": "^5.1.6"
-  }
+  },
+  "files": [
+    "dist",
+    "templates"
+  ]
 }

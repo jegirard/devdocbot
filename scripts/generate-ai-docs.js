@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const { analyzeFrontend } = require('./analyze-frontend.js');
 
 // Helper function to create directory if it doesn't exist
 function ensureDirectoryExists(dirPath) {
@@ -17,18 +16,21 @@ function generateAIDocs(options = {}) {
     } = options;
 
     const baseDir = path.join(outputDir, 'ai');
-    const frontendDir = path.join(baseDir, 'frontend');
-    
+    const serverDir = path.join(baseDir, 'server');
+    const clientDir = path.join(baseDir, 'client');
+
     // Create necessary directories
     [
         baseDir,
         path.join(baseDir, 'auth'),
         path.join(baseDir, 'auth', 'schemas'),
-        frontendDir,
-        path.join(frontendDir, 'pages'),
-        path.join(frontendDir, 'layouts'),
-        path.join(frontendDir, 'components'),
-        path.join(frontendDir, 'data')
+        clientDir,
+        path.join(clientDir, 'pages'),
+        path.join(clientDir, 'components'),
+        serverDir,
+        path.join(serverDir, 'routes'),
+        path.join(serverDir, 'models'),
+        path.join(serverDir, 'services')
     ].forEach(dir => ensureDirectoryExists(dir));
 
     // Generate root index.json with dynamic structure based on project
@@ -38,139 +40,89 @@ function generateAIDocs(options = {}) {
         modules: {}
     };
 
-    // Add auth module if it exists
-    if (fs.existsSync(path.join(projectRoot, 'backend/src/modules/auth'))) {
-        rootIndex.modules.auth = {
-            description: "Authentication and authorization system",
-            path: "auth/index.json",
-            handles: ["login", "registration", "session management"]
+    // Add server module if it exists
+    if (fs.existsSync(path.join(projectRoot, 'server/src'))) {
+        rootIndex.modules.server = {
+            description: "Backend server implementation",
+            path: "server/index.json",
+            handles: ["api", "authentication", "document-management", "notifications"]
         };
 
-        // Generate auth module index
-        const authIndex = {
-            login: {
-                description: "Authenticate user credentials and create session",
-                schema: "schemas/login.json",
-                related: ["session", "user"]
+        // Generate server module index
+        const serverIndex = {
+            routes: {
+                description: "API route handlers",
+                path: "routes/index.json",
+                endpoints: [
+                    "auth.routes.ts",
+                    "document.routes.ts",
+                    "ai.routes.ts",
+                    "notification.routes.ts"
+                ]
             },
-            register: {
-                description: "Create new user account",
-                schema: "schemas/register.json",
-                related: ["user"]
+            models: {
+                description: "Database models",
+                path: "models/index.json",
+                schemas: ["Document", "User"]
+            },
+            services: {
+                description: "Business logic services",
+                path: "services/index.json",
+                implementations: [
+                    "document.service.ts",
+                    "auth.service.ts",
+                    "notification.service.ts"
+                ]
             }
         };
 
         fs.writeFileSync(
-            path.join(baseDir, 'auth', 'index.json'),
-            JSON.stringify(authIndex, null, 2)
-        );
-
-        // Generate login schema
-        const loginSchema = {
-            request: {
-                username: "string",
-                password: "string"
-            },
-            response: {
-                token: "string",
-                refreshToken: "string"
-            }
-        };
-
-        fs.writeFileSync(
-            path.join(baseDir, 'auth', 'schemas', 'login.json'),
-            JSON.stringify(loginSchema, null, 2)
+            path.join(serverDir, 'index.json'),
+            JSON.stringify(serverIndex, null, 2)
         );
     }
 
-    // Add frontend module if it exists
-    if (fs.existsSync(path.join(projectRoot, 'frontend'))) {
-        rootIndex.modules.frontend = {
-            description: "Frontend application structure and components",
-            path: "frontend/index.json",
-            handles: ["pages", "layouts", "components", "routing", "state management"]
+    // Add client module if it exists
+    if (fs.existsSync(path.join(projectRoot, 'client/src'))) {
+        rootIndex.modules.client = {
+            description: "Frontend client application",
+            path: "client/index.json",
+            handles: ["pages", "components", "document-viewer", "notifications"]
         };
 
-        // Analyze frontend structure
-        const frontendStructure = analyzeFrontend(path.join(projectRoot, 'frontend/src'));
-        
-        // Generate frontend index
-        const frontendIndex = {
+        // Generate client module index
+        const clientIndex = {
             description: "Frontend application structure",
-            routes: frontendStructure.routes.map(route => ({
-                path: route.path,
-                component: route.component,
-                layout: route.layout,
-                exact: route.exact,
-                props: route.props
-            })),
-            pages: Object.keys(frontendStructure.pages).map(pageName => ({
-                name: pageName,
-                path: `pages/${pageName}.json`,
-                description: `${pageName} page component`,
-                dependencies: frontendStructure.pages[pageName].imports.map(imp => 
-                    typeof imp === 'string' ? imp : imp.source
-                ),
-                hasApiCalls: frontendStructure.pages[pageName].componentInfo?.apiCalls?.length > 0,
-                hasStateManagement: Boolean(frontendStructure.pages[pageName].componentInfo?.stateManagement?.useState?.length || 
-                                       frontendStructure.pages[pageName].componentInfo?.stateManagement?.useReducer?.length)
-            })),
-            layouts: Object.keys(frontendStructure.layouts).map(layoutName => ({
-                name: layoutName,
-                path: `layouts/${layoutName}.json`,
-                description: `${layoutName} layout component`
-            })),
-            components: Object.keys(frontendStructure.components).map(componentName => ({
-                name: componentName,
-                path: `components/${componentName}.json`,
-                description: `${componentName} reusable component`
-            }))
+            pages: [
+                {
+                    name: "Dashboard",
+                    path: "pages/dashboard.json",
+                    description: "Main dashboard view"
+                },
+                {
+                    name: "DocumentViewer",
+                    path: "pages/document-viewer.json",
+                    description: "Document viewing and analysis"
+                }
+            ],
+            components: [
+                {
+                    name: "DocumentUpload",
+                    path: "components/document-upload.json",
+                    description: "Document upload component"
+                },
+                {
+                    name: "DocumentList",
+                    path: "components/document-list.json",
+                    description: "Document listing component"
+                }
+            ]
         };
 
         fs.writeFileSync(
-            path.join(frontendDir, 'index.json'),
-            JSON.stringify(frontendIndex, null, 2)
+            path.join(clientDir, 'index.json'),
+            JSON.stringify(clientIndex, null, 2)
         );
-
-        // Generate detailed page documentation
-        Object.entries(frontendStructure.pages).forEach(([pageName, pageInfo]) => {
-            const pageDoc = {
-                name: pageName,
-                imports: pageInfo.imports,
-                exports: pageInfo.exports,
-                types: pageInfo.types,
-                componentInfo: {
-                    props: pageInfo.componentInfo.props,
-                    apiCalls: pageInfo.componentInfo.apiCalls,
-                    navigation: pageInfo.componentInfo.navigationCalls,
-                    eventHandlers: pageInfo.componentInfo.eventHandlers,
-                    stateManagement: pageInfo.componentInfo.stateManagement
-                },
-                relationships: {
-                    layouts: pageInfo.imports.filter(imp => 
-                        typeof imp === 'string' ? 
-                            imp.includes('layouts/') : 
-                            imp.source.includes('layouts/')
-                    ),
-                    components: pageInfo.imports.filter(imp => 
-                        typeof imp === 'string' ? 
-                            imp.includes('components/') : 
-                            imp.source.includes('components/')
-                    ),
-                    data: pageInfo.imports.filter(imp => 
-                        typeof imp === 'string' ? 
-                            imp.includes('data/') : 
-                            imp.source.includes('data/')
-                    ),
-                    navigatesTo: pageInfo.componentInfo.navigationCalls
-                }
-            };
-
-            fs.writeFileSync(
-                path.join(frontendDir, 'pages', `${pageName}.json`),
-                JSON.stringify(pageDoc, null, 2)
-            );
-        });
     }
 
     // Write main index file

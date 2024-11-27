@@ -1,164 +1,184 @@
 # DevDocBot
 
-A CLI tool designed to enable AI-assisted development by maintaining and querying up-to-date project documentation. DevDocBot automatically generates and consolidates project documentation into a single markdown file, which can then be queried through the Claude AI API, allowing development tools and AI agents to efficiently access project information without having to parse through numerous files.
-
-## Core Concept
-
-DevDocBot serves as a bridge between your project's codebase and AI development tools. Instead of having AI agents parse through numerous project files to understand the codebase, DevDocBot:
-
-1. Regularly generates comprehensive documentation that captures the current state of your project
-2. Consolidates this information into a single, queryable markdown file
-3. Provides a CLI interface for AI agents to ask questions about the project
-
-This approach significantly improves the efficiency of AI-assisted development by providing a single, authoritative source of project information that can be queried using natural language.
-
-## Integration with AI Development Tools
-
-DevDocBot is designed to work seamlessly with AI development tools. For example, in VS Code with the Cline AI assistant, you can set up the following custom instruction:
-
-```
-Always ask at the beginning of a task if the user would like to run the generate-docs script to update the documentation. 
-
-If you have any questions about the project structure or requirements or code, you can use a utility called devDocBot to ask any question about the code, using the following format: 
-
-devdocbot -f <markdown-file> -q "your question"
-
-For <markdown-file> use the documentation.md file in the /project-docs directory
-
-You can rely on the answers you get from devdocbot and don't need to confirm them elsewhere unless you need more help.
-
-If you can't get your answer there, please start with the index.json file in ai-docs and navigate to whatever you need before reading large files directly.
-```
-
-This setup ensures that:
-1. Documentation is always up-to-date before starting a task
-2. AI tools can efficiently query project information
-3. Large file reads are minimized by using the consolidated documentation
-
-## Features
-
-- **Automated Documentation Generation**: Regularly update project documentation to maintain an accurate representation of your codebase
-- **AI-Optimized Documentation Structure**: 
-  - Single markdown file for efficient querying
-  - Structured JSON files for detailed navigation
-  - Frontend analysis (React/TypeScript)
-  - API documentation (Swagger/OpenAPI)
-- **AI-Powered Documentation Querying**: Query your project's documentation using Claude AI for natural language answers
+A CLI tool to generate and query AI-optimized development documentation. DevDocBot consolidates all project documentation into a single, comprehensive file that can be easily queried using Claude AI.
 
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/jegirard/devdocbot.git
-
-# Install dependencies
-cd devdocbot
-npm install
-
-# Build the project
-npm run build
-
-# Link globally
-npm link
+npm install -g @devdocbot/cli
 ```
-
-## Project Integration
-
-### 1. Documentation Generation Setup
-
-Create a symlink to DevDocBot's documentation generation script:
-
-```bash
-# From your project root
-ln -sf path/to/devDocBot/scripts/generate-docs.sh generate-docs.sh
-```
-
-Expected directory structure:
-```
-your-project/
-├── generate-docs.sh -> ../path/to/devDocBot/scripts/generate-docs.sh
-├── project-docs/    # Generated documentation
-│   ├── documentation.md  # Main queryable documentation file
-│   └── ai/              # AI-optimized structure
-│       └── index.json   # Navigation index for detailed queries
-├── frontend/       # If you have a frontend
-│   └── src/
-└── backend/        # If you have a backend
-    └── src/
-```
-
-### 2. Regular Documentation Updates
-
-Run the documentation generation script:
-```bash
-./generate-docs.sh
-```
-
-It's recommended to:
-- Run this before starting new development tasks
-- Include it in your CI/CD pipeline
-- Run it after significant code changes
-
-### 3. Querying Documentation
-
-Use the CLI to query project information:
-
-```bash
-devdocbot -f project-docs/documentation.md -q "your question"
-```
-
-For AI tools, they can use this same command to efficiently gather project information.
 
 ## Configuration
 
-### Environment Variables
+Create a `devdocbot.config.js` file in your project root:
 
-Create a `.env` file with:
-
-```env
-ANTHROPIC_API_KEY=your_claude_api_key
+```js
+/** @type {import('@devdocbot/cli').Config} */
+module.exports = {
+  outputDir: './project-docs',
+  structure: {
+    server: {
+      root: 'server/src',
+      modules: {
+        routes: {
+          path: 'routes',
+          pattern: '**/*.routes.{ts,js}',
+          description: 'API route handlers'
+        },
+        models: {
+          path: 'models',
+          pattern: '**/*.model.{ts,js}',
+          description: 'Database models'
+        },
+        services: {
+          path: 'services',
+          pattern: '**/*.service.{ts,js}',
+          description: 'Business logic services'
+        }
+      }
+    },
+    client: {
+      root: 'client/src',
+      modules: {
+        pages: {
+          path: 'pages',
+          pattern: '**/*.{tsx,jsx}',
+          description: 'Page components'
+        },
+        components: {
+          path: 'components',
+          pattern: '**/*.{tsx,jsx}',
+          description: 'Reusable UI components'
+        }
+      }
+    }
+  },
+  options: {
+    includeSwagger: true,
+    swaggerPath: 'server/src/config/swagger.config.ts',
+    includeReadme: true
+  }
+};
 ```
 
-### Documentation Generation Options
+## Usage
 
-The generate-docs.sh script uses these environment variables:
-- `PROJECT_ROOT`: Root directory of the project to document (default: current directory)
-- `OUTPUT_DIR`: Where to output generated documentation (default: ./project-docs)
+### Generate Documentation
 
-Example:
 ```bash
-export PROJECT_ROOT=/path/to/your/project
-export OUTPUT_DIR=/path/to/output
-./generate-docs.sh
+devdocbot generate
 ```
+
+This command will:
+1. Read your project configuration from devdocbot.config.js
+2. Generate comprehensive documentation based on your project structure
+3. Create a single file called 'devdocbot-documentation' in your configured output directory
+
+The generated documentation includes:
+- Project overview (from README)
+- Server-side code documentation
+- Client-side code documentation
+- API documentation (if Swagger is configured)
+
+### Query Documentation
+
+```bash
+devdocbot query -q "How is authentication handled?"
+```
+
+Options:
+- `-q, --question`: Question to ask about the documentation (required)
+- `-f, --file`: Path to documentation file (defaults to ./project-docs/devdocbot-documentation)
+- `-k, --key`: Claude API key (can also be set via ANTHROPIC_API_KEY environment variable)
+- `-i, --instructions`: Additional instructions for Claude
 
 ## Documentation Structure
 
-The generated documentation is organized as:
+The generated 'devdocbot-documentation' file contains:
+
+1. Project Overview
+   - Content from README.md (if configured)
+   - Project structure overview
+
+2. Server Documentation (if configured)
+   - Route handlers
+   - Database models
+   - Business logic services
+   - Other configured server modules
+
+3. Client Documentation (if configured)
+   - Pages
+   - Components
+   - Other configured client modules
+
+4. API Documentation
+   - Swagger/OpenAPI documentation (if configured)
+
+## Environment Variables
+
+- `ANTHROPIC_API_KEY`: Your Claude API key for querying documentation
+
+## Customization
+
+You can customize the documentation generation by:
+
+1. Modifying the module patterns in devdocbot.config.js
+2. Adding new module types to the structure
+3. Configuring additional options in the config file
+
+## Example Configuration for Different Project Types
+
+### Node.js API Project
+```js
+module.exports = {
+  outputDir: './project-docs',
+  structure: {
+    server: {
+      root: 'src',
+      modules: {
+        controllers: {
+          path: 'controllers',
+          pattern: '**/*.controller.js',
+          description: 'Request handlers'
+        },
+        models: {
+          path: 'models',
+          pattern: '**/*.model.js',
+          description: 'Data models'
+        }
+      }
+    }
+  },
+  options: {
+    includeReadme: true,
+    includeSwagger: true,
+    swaggerPath: 'src/swagger.json'
+  }
+};
 ```
-project-docs/
-├── documentation.md  # Main queryable documentation file
-└── ai/              # AI-optimized documentation structure
-    ├── index.json   # Navigation index
-    ├── frontend/    # Frontend-specific documentation
-    └── auth/        # Authentication documentation
-```
 
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-ISC
-
-## Dependencies
-
-- `@anthropic-ai/sdk`: Claude AI API client
-- `@babel/parser` & `@babel/traverse`: JavaScript/TypeScript parsing
-- `commander`: CLI framework
-- `swagger-jsdoc`: API documentation generation
+### React Frontend Project
+```js
+module.exports = {
+  outputDir: './project-docs',
+  structure: {
+    client: {
+      root: 'src',
+      modules: {
+        components: {
+          path: 'components',
+          pattern: '**/*.tsx',
+          description: 'React components'
+        },
+        hooks: {
+          path: 'hooks',
+          pattern: '**/*.ts',
+          description: 'Custom React hooks'
+        }
+      }
+    }
+  },
+  options: {
+    includeReadme: true
+  }
+};

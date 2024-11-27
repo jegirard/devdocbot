@@ -9,10 +9,19 @@ const promises_1 = require("fs/promises");
 const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const path_1 = __importDefault(require("path"));
 const dotenv_1 = __importDefault(require("dotenv"));
-// Load environment variables from .env file, looking in the devDocBot installation directory
-const envPath = path_1.default.join(__dirname, '..', '.env');
-dotenv_1.default.config({ path: envPath });
+const cosmiconfig_1 = require("cosmiconfig");
+const docs_1 = require("./generators/docs");
+// Load environment variables
+dotenv_1.default.config();
 const program = new commander_1.Command();
+async function loadConfig() {
+    const explorer = (0, cosmiconfig_1.cosmiconfig)('devdocbot');
+    const result = await explorer.search();
+    if (!result || result.isEmpty) {
+        throw new Error('No configuration file found. Please create a devdocbot.config.js file.');
+    }
+    return result.config;
+}
 async function loadCustomInstructions() {
     try {
         const instructionsPath = path_1.default.join(__dirname, '..', 'config', 'prompt-instructions.txt');
@@ -72,13 +81,32 @@ Please answer the question based solely on the content of the markdown document 
 }
 program
     .name('devdocbot')
-    .description('CLI tool to query development documentation using Claude AI')
+    .description('CLI tool to generate and query development documentation')
     .version('1.0.0');
 program
-    .requiredOption('-f, --file <path>', 'path to markdown file')
+    .command('generate')
+    .description('Generate project documentation')
+    .action(async () => {
+    try {
+        const config = await loadConfig();
+        await (0, docs_1.generateDocs)(config);
+        console.log('Documentation generated successfully!');
+        console.log(`Output file: ${path_1.default.join(config.outputDir, 'devdocbot-documentation')}`);
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            console.error('Error:', error.message);
+            process.exit(1);
+        }
+    }
+});
+program
+    .command('query')
+    .description('Query documentation using Claude AI')
+    .option('-f, --file <path>', 'path to documentation file (defaults to ./project-docs/devdocbot-documentation)')
     .requiredOption('-q, --question <string>', 'question to ask about the documentation')
     .option('-k, --key <string>', 'Claude API key (can also be set via ANTHROPIC_API_KEY environment variable)')
-    .option('-i, --instructions <string>', 'Additional instructions for Claude (appended to default instructions)')
+    .option('-i, --instructions <string>', 'Additional instructions for Claude')
     .action(async (options) => {
     try {
         const apiKey = options.key || process.env.ANTHROPIC_API_KEY;
@@ -86,7 +114,9 @@ program
             console.error('Error: Claude API key must be provided either via --key option or ANTHROPIC_API_KEY environment variable');
             process.exit(1);
         }
-        const filePath = path_1.default.resolve(options.file);
+        const config = await loadConfig();
+        const defaultPath = path_1.default.join(config.outputDir, 'devdocbot-documentation');
+        const filePath = path_1.default.resolve(options.file || defaultPath);
         const response = await queryMarkdown(filePath, options.question, apiKey, options.instructions);
         console.log('\nAnswer:', response);
     }
