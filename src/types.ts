@@ -6,21 +6,12 @@ export interface ModuleConfig {
 
 export interface ServerConfig {
   root: string;
-  modules: {
-    routes?: ModuleConfig;
-    models?: ModuleConfig;
-    services?: ModuleConfig;
-    [key: string]: ModuleConfig | undefined;
-  };
+  pattern?: string;
 }
 
 export interface ClientConfig {
   root: string;
-  modules: {
-    pages?: ModuleConfig;
-    components?: ModuleConfig;
-    [key: string]: ModuleConfig | undefined;
-  };
+  pattern?: string;
 }
 
 export interface ProjectStructure {

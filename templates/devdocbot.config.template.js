@@ -1,61 +1,34 @@
 /** @type {import('@devdocbot/cli').Config} */
 module.exports = {
+  // Output directory for generated documentation
   outputDir: './project-docs',
+  
+  // Project structure configuration
   structure: {
+    // Server-side configuration
     server: {
-      root: 'server/src',  // Change this to your server source directory
-      modules: {
-        routes: {
-          path: 'routes',
-          pattern: '**/*.routes.{ts,js}',
-          description: 'API route handlers'
-        },
-        services: {
-          path: 'services',
-          pattern: '**/*.service.{ts,js}',
-          description: 'Business logic services'
-        },
-        utils: {
-          path: 'utils',
-          pattern: '**/*.{ts,js}',
-          description: 'Utility functions'
-        },
-        config: {
-          path: 'config',
-          pattern: '**/*.{ts,js}',
-          description: 'Configuration files'
-        }
-      }
+      // Root directory of server code
+      root: 'src',
+      // Optional: Pattern for source files (defaults to **/*.{ts,js})
+      pattern: '**/*.{ts,js}'
     },
+    
+    // Client-side configuration (optional)
     client: {
-      root: 'client/src',  // Change this to your client source directory
-      modules: {
-        pages: {
-          path: 'pages',
-          pattern: '**/*.{tsx,jsx}',
-          description: 'Page components'
-        },
-        components: {
-          path: 'components',
-          pattern: '**/*.{tsx,jsx}',
-          description: 'Reusable UI components'
-        },
-        services: {
-          path: 'services',
-          pattern: '**/*.{ts,js}',
-          description: 'API services'
-        },
-        utils: {
-          path: 'utils',
-          pattern: '**/*.{ts,js}',
-          description: 'Utility functions'
-        }
-      }
+      // Root directory of client code
+      root: 'client/src',
+      // Optional: Pattern for source files (defaults to **/*.{tsx,jsx})
+      pattern: '**/*.{tsx,jsx}'
     }
   },
+
+  // Documentation generation options
   options: {
+    // Include API documentation from Swagger
     includeSwagger: true,
-    swaggerPath: 'server/src/config/swagger.config.ts',  // Change this to your swagger file path
+    swaggerPath: 'src/config/swagger.ts',
+    
+    // Include README in documentation
     includeReadme: true
   }
 };

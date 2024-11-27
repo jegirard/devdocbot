@@ -6,18 +6,6 @@ import fs from 'fs/promises';
 
 const SOURCE_CODE_PATTERN = /\.(ts|js|tsx|jsx|java|py|rb|go|rs|cpp|c|h|hpp|cs|php|swift|kt)$/;
 
-function globToRegex(pattern: string): string {
-  return pattern
-    // Escape special regex characters
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    // Convert glob ** to regex
-    .replace(/\*\*/g, '.*')
-    // Convert glob * to regex
-    .replace(/\*/g, '[^/]*')
-    // Handle extensions like {ts,js}
-    .replace(/\{([^}]+)\}/g, '($1)');
-}
-
 export async function generateVectorDocs(config: Config): Promise<void> {
   // Initialize vector store with default config
   const vectorStore = await createVectorStore(getDefaultConfig());
@@ -26,57 +14,49 @@ export async function generateVectorDocs(config: Config): Promise<void> {
   try {
     let hasProcessedFiles = false;
 
-    // Process server-side modules if they exist
-    if (config.structure.server) {
-      for (const [moduleName, moduleConfig] of Object.entries(config.structure.server.modules)) {
-        if (!moduleConfig) continue;
-
-        const modulePath = path.join(config.structure.server.root, moduleConfig.path);
-        try {
-          console.log(`Processing server source code in ${modulePath}`);
-          
-          const regex = new RegExp(globToRegex(moduleConfig.pattern));
-          const files = await getAllFiles(modulePath, regex);
-          
-          if (files.length > 0) {
-            hasProcessedFiles = true;
-            for (const file of files) {
-              const chunks = chunker.chunkCode(file, `server/${moduleName}`);
-              await vectorStore.addChunks(chunks);
-            }
-          } else {
-            console.warn(`Warning: No matching files found in '${modulePath}'`);
+    // Process server-side code if root is specified
+    if (config.structure.server?.root) {
+      console.log(`Processing server source code in ${config.structure.server.root}`);
+      try {
+        const pattern = config.structure.server.pattern || '**/*.{ts,js}';
+        const regex = new RegExp(SOURCE_CODE_PATTERN);
+        const files = await getAllFiles(config.structure.server.root, regex);
+        
+        if (files.length > 0) {
+          hasProcessedFiles = true;
+          for (const file of files) {
+            const relativePath = path.relative(config.structure.server.root, file.path);
+            const chunks = chunker.chunkCode(file, `server/${relativePath}`);
+            await vectorStore.addChunks(chunks);
           }
-        } catch (error) {
-          console.warn(`Warning: Could not process module '${moduleName}' at path '${modulePath}' - Directory may not exist`);
+        } else {
+          console.warn(`Warning: No matching files found in '${config.structure.server.root}'`);
         }
+      } catch (error) {
+        console.warn(`Warning: Could not process server code at path '${config.structure.server.root}' - Directory may not exist`);
       }
     }
 
-    // Process client-side modules if they exist
-    if (config.structure.client) {
-      for (const [moduleName, moduleConfig] of Object.entries(config.structure.client.modules)) {
-        if (!moduleConfig) continue;
-
-        const modulePath = path.join(config.structure.client.root, moduleConfig.path);
-        try {
-          console.log(`Processing client source code in ${modulePath}`);
-          
-          const regex = new RegExp(globToRegex(moduleConfig.pattern));
-          const files = await getAllFiles(modulePath, regex);
-          
-          if (files.length > 0) {
-            hasProcessedFiles = true;
-            for (const file of files) {
-              const chunks = chunker.chunkCode(file, `client/${moduleName}`);
-              await vectorStore.addChunks(chunks);
-            }
-          } else {
-            console.warn(`Warning: No matching files found in '${modulePath}'`);
+    // Process client-side code if root is specified
+    if (config.structure.client?.root) {
+      console.log(`Processing client source code in ${config.structure.client.root}`);
+      try {
+        const pattern = config.structure.client.pattern || '**/*.{tsx,jsx}';
+        const regex = new RegExp(SOURCE_CODE_PATTERN);
+        const files = await getAllFiles(config.structure.client.root, regex);
+        
+        if (files.length > 0) {
+          hasProcessedFiles = true;
+          for (const file of files) {
+            const relativePath = path.relative(config.structure.client.root, file.path);
+            const chunks = chunker.chunkCode(file, `client/${relativePath}`);
+            await vectorStore.addChunks(chunks);
           }
-        } catch (error) {
-          console.warn(`Warning: Could not process module '${moduleName}' at path '${modulePath}' - Directory may not exist`);
+        } else {
+          console.warn(`Warning: No matching files found in '${config.structure.client.root}'`);
         }
+      } catch (error) {
+        console.warn(`Warning: Could not process client code at path '${config.structure.client.root}' - Directory may not exist`);
       }
     }
 
