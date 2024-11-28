@@ -13,12 +13,13 @@ export async function generateSummaryDoc(config: Config): Promise<void> {
       const pattern = config.structure.server.pattern || '**/*.{ts,js}';
       const files = await getFiles(serverPath, pattern);
       
-      // First, identify all modules
-      const modules = await identifyModules(serverPath);
+      // First, identify all modules from the modules directory
+      const modulesPath = path.join(serverPath, 'modules');
+      const modules = await identifyModules(modulesPath);
       console.log('Discovered server modules:', Object.keys(modules));
 
       // Group files by module
-      const filesByModule = groupFilesByModule(files, modules, serverPath);
+      const filesByModule = groupFilesByModule(files, modules, modulesPath);
       for (const [moduleName, moduleFiles] of Object.entries(filesByModule)) {
         documentation.server[moduleName] = {
           name: moduleName,
@@ -39,12 +40,13 @@ export async function generateSummaryDoc(config: Config): Promise<void> {
       const pattern = config.structure.client.pattern || '**/*.{tsx,jsx}';
       const files = await getFiles(clientPath, pattern);
       
-      // First, identify all modules
-      const modules = await identifyModules(clientPath);
+      // First, identify all modules from the modules directory
+      const modulesPath = path.join(clientPath, 'modules');
+      const modules = await identifyModules(modulesPath);
       console.log('Discovered client modules:', Object.keys(modules));
 
       // Group files by module
-      const filesByModule = groupFilesByModule(files, modules, clientPath);
+      const filesByModule = groupFilesByModule(files, modules, modulesPath);
       for (const [moduleName, moduleFiles] of Object.entries(filesByModule)) {
         documentation.client[moduleName] = {
           name: moduleName,
@@ -128,89 +130,53 @@ function extractModulesFromSwagger(swaggerContent: string): Array<{ name: string
   }
 }
 
-async function identifyModules(dir: string): Promise<{ [key: string]: string }> {
+async function identifyModules(modulesDir: string): Promise<{ [key: string]: string }> {
   const modules: { [key: string]: string } = {};
   
-  async function scan(directory: string) {
-    try {
-      const entries = await fs.readdir(directory, { withFileTypes: true });
-      
-      for (const entry of entries) {
-        if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
-          const fullPath = path.join(directory, entry.name);
-          
-          // Check if directory contains module-related files
+  try {
+    const entries = await fs.readdir(modulesDir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        const fullPath = path.join(modulesDir, entry.name);
+        
+        // Try to find a description from index.ts, module.ts, or similar files
+        let description = `${entry.name} module`;
+        const possibleFiles = ['index.ts', `${entry.name}.module.ts`, 'module.ts'];
+        
+        for (const file of possibleFiles) {
           try {
-            const files = await fs.readdir(fullPath);
-            const hasModuleFiles = files.some(file => 
-              file.includes('module') || 
-              file.includes('controller') || 
-              file.includes('service') ||
-              file.includes('routes') ||
-              file.includes('middleware') ||
-              file.includes('model') ||
-              file.includes('entity')
-            );
-
-            // Check if directory name indicates a module
-            const isModuleDir = entry.name.includes('module') || 
-                              entry.name === 'modules' ||
-                              entry.name === 'auth' ||
-                              entry.name === 'admin' ||
-                              entry.name === 'api' ||
-                              entry.name === 'core';
-            
-            if (hasModuleFiles || isModuleDir) {
-              // Try to find a description from index.ts, module.ts, or similar files
-              let description = `${entry.name} module`;
-              const possibleFiles = ['index.ts', `${entry.name}.module.ts`, 'module.ts'];
-              
-              for (const file of possibleFiles) {
-                try {
-                  const content = await fs.readFile(path.join(fullPath, file), 'utf-8');
-                  const descMatch = content.match(/\/\*\*([\s\S]*?)\*\//);
-                  if (descMatch) {
-                    description = descMatch[1].replace(/\s*\*\s*/g, ' ').trim();
-                    break;
-                  }
-                } catch {
-                  // File doesn't exist or can't be read, continue to next file
-                }
-              }
-              
-              modules[entry.name] = description;
+            const content = await fs.readFile(path.join(fullPath, file), 'utf-8');
+            const descMatch = content.match(/\/\*\*([\s\S]*?)\*\//);
+            if (descMatch) {
+              description = descMatch[1].replace(/\s*\*\s*/g, ' ').trim();
+              break;
             }
-
-            // Recursively scan subdirectories
-            await scan(fullPath);
-          } catch (error) {
-            console.warn(`Warning: Could not process directory '${fullPath}'`);
+          } catch {
+            // File doesn't exist or can't be read, continue to next file
           }
         }
+        
+        modules[entry.name] = description;
       }
-    } catch (error) {
-      console.warn(`Warning: Could not scan directory '${directory}'`);
     }
+  } catch (error) {
+    console.warn(`Warning: Could not scan modules directory '${modulesDir}'`);
   }
   
-  await scan(dir);
   return modules;
 }
 
-function groupFilesByModule(files: FileContent[], modules: { [key: string]: string }, rootPath: string): { [key: string]: FileContent[] } {
+function groupFilesByModule(files: FileContent[], modules: { [key: string]: string }, modulesDir: string): { [key: string]: FileContent[] } {
   const groups: { [key: string]: FileContent[] } = {};
   
   for (const file of files) {
-    // Get relative path from root
-    const relativePath = path.relative(rootPath, file.path);
-    // Find which module this file belongs to
-    const moduleName = Object.keys(modules).find(module => 
-      relativePath.startsWith(module) || 
-      relativePath.includes(`/${module}/`) ||
-      relativePath.includes(`\\${module}\\`)
-    );
+    // Get relative path from modules directory
+    const relativePath = path.relative(modulesDir, file.path);
+    // Get the top-level directory name (module name)
+    const moduleName = relativePath.split(path.sep)[0];
     
-    if (moduleName) {
+    if (modules[moduleName]) {
       if (!groups[moduleName]) {
         groups[moduleName] = [];
       }
